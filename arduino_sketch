@@ -1,0 +1,109 @@
+int touchRead_pin = 1;
+int data;
+int touchThreshold=0;
+int currentWavNum=0;
+bool isTriggered;
+#define NUM_SAMPLES 4
+// START OF TEENSY AUDIO CODE
+#include <Audio.h>
+#include <Wire.h>
+#include <SPI.h>
+#include <SD.h>
+#include <SerialFlash.h>
+// GUItool: begin automatically generated code
+AudioPlaySdWav           playSdWav1;     //xy=91,224
+AudioAmplifier           amp1;           //xy=227,223
+AudioEffectFreeverb      freeverb1;      //xy=376,229
+AudioOutputI2S           i2s1;           //xy=534,216
+AudioConnection          patchCord1(playSdWav1, 0, amp1, 0);
+AudioConnection          patchCord2(amp1, freeverb1);
+AudioConnection          patchCord3(freeverb1, 0, i2s1, 0);
+AudioConnection          patchCord4(freeverb1, 0, i2s1, 1);
+AudioControlSGTL5000     sgtl5000_1;     //xy=557,260
+// GUItool: end automatically generated code
+// END OF TEENSY AUDIO CODE
+void setup() {
+  // put your setup code here, to run once:
+  setupBoardUtilities();
+  setupAudioSettings();
+  setCalibrationMode();
+ 
+}
+// START OF AUDIO FX SETTINGS
+void setupAudioSettings(){
+  amp1.gain(0.2);
+  freeverb1.roomsize(0.5);
+  freeverb1.damping(0.2);
+  sgtl5000_1.volume(0.9);
+}
+// END OF AUDIO FX SETINGS
+void loop() {
+  // put your main code here, to run repeatedly:
+  data = touchRead(touchRead_pin);
+  //Serial.println(data);
+  if(data>touchThreshold && isTriggered == false){
+    Serial.print("TRIGGER - ");
+    Serial.print(currentWavNum);
+    Serial.print(" ");
+    Serial.println(data);
+    isTriggered=true;
+    if(currentWavNum==0)playSdWav1.play("01.WAV");
+    if(currentWavNum==1)playSdWav1.play("02.WAV");
+    if(currentWavNum==2)playSdWav1.play("03.WAV");
+    if(currentWavNum==3)playSdWav1.play("04.WAV");
+    delay(300);
+  }
+  else if(data<touchThreshold && isTriggered == true){
+    Serial.print("TRIGGER OFF - ");
+    Serial.println(data);
+    isTriggered=false;
+    playSdWav1.stop();
+    int randNum = currentWavNum;
+    while(randNum==currentWavNum){
+      randNum=random(0,NUM_SAMPLES);
+    }
+    currentWavNum=randNum;
+    if(currentWavNum>=NUM_SAMPLES)currentWavNum=0;
+    int memUse = AudioMemoryUsageMax();
+    Serial.print("Audio Memory");
+    Serial.println(memUse);
+  }
+  delay(30);
+}
+/*
+ * Board Utilities and Calibration, dont need to touch this unless things go wrong!!
+ */
+void setupBoardUtilities(){
+  Serial.begin(9600);
+  AudioMemory(10);
+  SPI.setMOSI(7);
+  SPI.setSCK(14);
+  if(!SD.begin(10)){
+    while (1){
+      Serial.println("unable to read sd");
+      delay(500);
+    }
+  }
+  else Serial.println("SD Card Read OK");
+  sgtl5000_1.enable();
+}
+void setCalibrationMode()
+{
+  // calibrate the first sensor
+  // by reading 50 values and get the minimum value and apply it as a threshold
+  delay(1000);
+  int numberOfattempt=100;
+  int Threshold=100;
+  int T_read=0;
+  
+  for (int i=0;i<numberOfattempt;i++)
+  {
+    T_read=touchRead(touchRead_pin);
+    delay(20);
+    Threshold=max(Threshold,T_read);
+  }
+  touchThreshold=Threshold*1.2;
+  Serial.print("Thresold= ");
+  Serial.println(touchThreshold);
+ //********************
+}
